@@ -1,6 +1,6 @@
 # FNC Fix
 
-A web-based tool for viewing, validating, and modifying FNC (Fabrication NC) files used in steel fabrication and CNC machinery.
+A webapp for viewing, validating, and modifying FNC files used in steel fabrication and CNC machinery.
 
 ## Features
 
