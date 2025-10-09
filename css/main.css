@@ -561,6 +561,11 @@ table thead th {
     font-size: 1rem;
 }
 
+/* Warning section */
+.section.warning>h6 {
+    color: #ff6f00;
+}
+
 /* Warning data items */
 .data-item.warning {
     background: rgba(255, 193, 7, 0.1);

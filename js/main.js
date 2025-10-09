@@ -196,36 +196,36 @@ function renderProfiles(profiles) {
                 <span class="card-title">Profiles (${profiles.length})</span>
                 ${profiles.map((p, i) => {
                     // Define mismatch before using it
-                    const mismatch = i > 0 && isProfileMismatch(p, ref);
+                    const mismatch = i > 0 && isProfileMismatch(p, ref, true);
                     return `
                         <div class="section ${mismatch ? 'warning' : ''}">
                             <h6>Profile ${i + 1}${mismatch ? ' Mismatch with first profile' : ''}</h6>
                             <div class="data-grid">
-                                <div class="data-item">
+                                <div class="data-item ${mismatch ? 'warning' : ''}">
                                     <span class="data-label">Profile Type (CP):</span>
                                     <span class="data-value">${p.profileType || '-'}</span>
                                 </div>
-                                <div class="data-item">
+                                <div class="data-item ${mismatch ? 'warning' : ''}">
                                     <span class="data-label">Profile (P):</span>
                                     <span class="data-value">${p.profile || '-'}</span>
                                 </div>
-                                <div class="data-item">
+                                <div class="data-item ${mismatch ? 'warning' : ''}">
                                     <span class="data-label">Height (SA):</span>
                                     <span class="data-value">${p.height || '-'} mm</span>
                                 </div>
-                                <div class="data-item">
+                                <div class="data-item ${mismatch ? 'warning' : ''}">
                                     <span class="data-label">Web Thickness (TA):</span>
                                     <span class="data-value">${p.webThickness || '-'} mm</span>
                                 </div>
-                                <div class="data-item">
+                                <div class="data-item ${mismatch ? 'warning' : ''}">
                                     <span class="data-label">Width (SB):</span>
                                     <span class="data-value">${p.width || '-'} mm</span>
                                 </div>
-                                <div class="data-item">
+                                <div class="data-item ${mismatch ? 'warning' : ''}">
                                     <span class="data-label">Flange Thickness (TB):</span>
                                     <span class="data-value">${p.flangeThickness || '-'} mm</span>
                                 </div>
-                                <div class="data-item">
+                                <div class="data-item ${mismatch ? 'warning' : ''}">
                                     <span class="data-label">Weight/Meter (WL):</span>
                                     <span class="data-value">${p.weightPerMeter || '-'} kg/m</span>
                                 </div>
@@ -263,10 +263,20 @@ function renderMaterials(materials) {
 }
 
 
-function isProfileMismatch(item, ref) {
+function isProfileMismatch(item, ref, fullCheck = false) {
     if (!ref || !item) return false;
 
-    return (
+    return fullCheck
+    ? (
+        item.profileType !== ref.profileType ||
+        item.profile !== ref.profile ||
+        item.height !== ref.height ||
+        item.webThickness !== ref.webThickness ||
+        item.width !== ref.width ||
+        item.flangeThickness !== ref.flangeThickness ||
+        item.weightPerMeter !== ref.weightPerMeter
+    )
+    : (
         item.profileType !== ref.profileType ||
         item.profile !== ref.profile
     );
@@ -464,7 +474,7 @@ function downloadModifiedFNC() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = currentFilename.replace(/\.fnc$/i, '') + '.fnc';
+    a.download = currentFilename;
     a.click();
     URL.revokeObjectURL(url);
 
@@ -628,6 +638,9 @@ function updateOptionsPanel() {
     `;
     
     setupOptionsListeners();
+    // Re-attach download button listener
+    const dlBtn = document.getElementById('download-fnc-btn');
+    if (dlBtn) dlBtn.addEventListener('click', downloadModifiedFNC);
 }
 
 // Initialize empty options panel
@@ -806,11 +819,21 @@ function fixAllProfiles() {
 
     const newCP = `CP:${ref.profileType}`;
     const newP = `P:${ref.profile}`;
+    const newSA = `SA${ref.height}`;
+    const newTA = `TA${ref.webThickness}`;
+    const newSB = `SB${ref.width}`;
+    const newTB = `TB${ref.flangeThickness}`;
+    const newWL = `WL${ref.weightPerMeter}`;
 
-    // Replace any CP:... and P:... in the file
+    // Replace any profile data with first profile data in the file
     originalFileContent = originalFileContent
         .replace(/P:[^\s]+/g, newP)
-        .replace(/CP:[^\s]+/g, newCP);
+        .replace(/CP:[^\s]+/g, newCP)
+        .replace(/SA[^\s]+/g, newSA)
+        .replace(/TA[^\s]+/g, newTA)
+        .replace(/SB[^\s]+/g, newSB)
+        .replace(/TB[^\s]+/g, newTB)
+        .replace(/WL[^\s]+/g, newWL);
 
     // Re-parse updated file
     currentData = parseFNC(originalFileContent);
