@@ -168,7 +168,8 @@ function parseBarHeader(headerText) {
 
 function parseBarPieces(piecesText) {
     const pieces = [];
-    const regex = /C:(\S+)\s+D:(\S+)\s+N:(\d+)\s+QT(\d+)/g;
+    // Regex to match pieces in bar section with optional POS
+    const regex = /C:(\S+)\s+D:(\S+)\s+N:(\S+)\s+(?:POS:(\S+)\s+)?QT(\d+)/g;
     let match;
 
     while ((match = regex.exec(piecesText)) !== null) {
@@ -176,7 +177,8 @@ function parseBarPieces(piecesText) {
             project: match[1],
             drawing: match[2],
             mark: match[3],
-            quantity: parseInt(match[4])
+            position: match[4] || null, // Handle optional POS
+            quantity: parseInt(match[5])
         });
     }
 
@@ -416,6 +418,7 @@ function renderBars(bars) {
                                         <th>Project</th>
                                         <th>Drawing</th>
                                         <th>Mark</th>
+                                        <th>Position</th>
                                         <th>Quantity</th>
                                     </tr>
                                 </thead>
@@ -425,6 +428,7 @@ function renderBars(bars) {
                                             <td>${p.project}</td>
                                             <td>${p.drawing}</td>
                                             <td>${p.mark}</td>
+                                            <td>${p.position ? p.position : '-'}</td>
                                             <td>${p.quantity}</td>
                                         </tr>
                                     `).join('')}
