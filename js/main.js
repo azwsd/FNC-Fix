@@ -654,7 +654,6 @@ function updateOptionsPanel() {
     const consistencyHTML = `
         <div class="option-section consistency-section">
             <h6>Consistency Checks</h6>
-            ${lengthWarningHTML}
             ${profileMismatchWarningHTML}
             ${materialMismatchWarningHTML}
             ${duplicateBarsWarningHTML}
@@ -668,6 +667,7 @@ function updateOptionsPanel() {
             ${consistencyHTML}
 
             <div class="option-section">
+                ${lengthWarningHTML}
                 <h6>Max Length Settings</h6>
                 <div class="input-field">
                     <label for="max-drawing-length" class="active">Max Drawing Length</label>
@@ -677,9 +677,7 @@ function updateOptionsPanel() {
                     <label for="max-position-length" class="active">Max Position Length</label>
                     <input type="number" id="max-position-length" value="${maxPositionLength}" min="1">
                 </div>
-            </div>
-            
-            <div class="option-section">
+
                 <h6>Text Replacements</h6>
                 <div id="replacements-container">
                     <div class="replacement-item">
@@ -696,7 +694,7 @@ function updateOptionsPanel() {
                 <button class="btn-small waves-effect" id="add-replacement">
                     Add More
                 </button>
-                <button class="btn waves-effect waves-light" id="execute-replacements">
+                <button class="btn-small purple lighten-1 waves-effect" id="execute-replacements">
                     Execute Replacements
                 </button>
             </div>
