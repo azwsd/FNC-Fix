@@ -516,10 +516,6 @@ function displayData(data, filename) {
     `;
 
     updateOptionsPanel();
-
-    // Hook download button
-    const dlBtn = document.getElementById('download-fnc-btn');
-    if (dlBtn) dlBtn.addEventListener('click', downloadModifiedFNC);
 }
 
 function downloadModifiedFNC() {
