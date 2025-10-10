@@ -65,6 +65,7 @@ function parseFNC(content) {
                 j++;
             }
             currentBar.pieces = parseBarPieces(pieceLines.join(' '));
+            currentBar.hash = hashBar(currentBar);
             data.bars.push(currentBar);
             currentBar = null;
         } else if (currentPiece && line === '' && currentBlock === 'PCS') {
@@ -80,6 +81,57 @@ function parseFNC(content) {
     }
 
     return data;
+}
+
+// Hash function for bars
+function hashBar(bar) {
+  // Sort and hash the pieces array
+  const piecesHash = bar.pieces
+    ? bar.pieces
+        .map(piece => [
+          piece.project || '',
+          piece.drawing || '',
+          piece.mark || '',
+          piece.position || '',
+          piece.quantity || ''
+        ].join('|'))
+        .sort()
+        .join('||')
+    : '';
+  
+  // Create a string from all properties
+  const hashString = [
+    bar.material || '',
+    bar.profileType || '',
+    bar.profile || '',
+    bar.length || '',
+    bar.quantity || '',
+    bar.data || '',
+    piecesHash
+  ].join('###');
+  
+  // djb2 algorithm
+  let hash = 5381;
+  for (let i = 0; i < hashString.length; i++) {
+    hash = ((hash << 5) + hash) + hashString.charCodeAt(i); // hash * 33 + c
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  return hash.toString(36); // Convert to base-36 for shorter string
+}
+
+function groupSimilarBars() {
+    const barGroups = new Map();
+    currentData.bars.forEach(bar => {
+        const hash = bar.hash;
+        if (!barGroups.has(hash)) {
+            barGroups.set(hash, {bar : bar, totalQuantity: 0 });
+        }
+        const group = barGroups.get(hash);
+        group.totalQuantity += (bar.quantity || 0);
+    });
+    
+    return barGroups;
 }
 
 function parseProfile(line) {
@@ -153,7 +205,8 @@ function parseBarHeader(headerText) {
         cp: headerText.match(/CP:(\S+)/),
         p: headerText.match(/(?<!C)P:([^\s]+)/),
         lb: headerText.match(/LB([\d.]+)/),
-        bi: headerText.match(/BI(\d+)/)
+        bi: headerText.match(/BI(\d+)/),
+        data: headerText.match(/BI\d+\s+(.*?)$/m)
     };
 
     if (matches.n) bar.name = matches.n[1];
@@ -162,6 +215,7 @@ function parseBarHeader(headerText) {
     if (matches.p) bar.profile = matches.p[1];
     if (matches.lb) bar.length = parseFloat(matches.lb[1]);
     if (matches.bi) bar.quantity = parseInt(matches.bi[1]);
+    if (matches.data) bar.data = matches.data[1];
 
     return bar;
 }
@@ -632,7 +686,14 @@ function updateOptionsPanel() {
                     Execute Replacements
                 </button>
             </div>
-            
+
+            <div class="option-section">
+                <h6>Group Similar Bars/Nests</h6>
+                <button class="btn waves-effect waves-light" id="group-bars-btn">
+                    Group Similar Bars/Nests
+                </button>
+            </div>
+
             <div class="option-section">
                 <button class="btn waves-effect waves-light" id="download-fnc-btn">
                     Download Modified FNC
@@ -642,9 +703,6 @@ function updateOptionsPanel() {
     `;
     
     setupOptionsListeners();
-    // Re-attach download button listener
-    const dlBtn = document.getElementById('download-fnc-btn');
-    if (dlBtn) dlBtn.addEventListener('click', downloadModifiedFNC);
 }
 
 // Initialize empty options panel
@@ -721,6 +779,13 @@ function setupOptionsListeners() {
     const fixMaterialsBtn = document.getElementById('fix-materials');
     if (fixMaterialsBtn) fixMaterialsBtn.addEventListener('click', fixAllMaterials);
 
+    // Attach group similar bras/nests button event listener
+    const grBtn = document.getElementById('group-bars-btn');
+    if (grBtn) grBtn.addEventListener('click', fixSimilarBars);
+
+    // Attach download fnc button event listener
+    const dlBtn = document.getElementById('download-fnc-btn');
+    if (dlBtn) dlBtn.addEventListener('click', downloadModifiedFNC);
 }
 
 // Execute text replacements
@@ -860,6 +925,46 @@ function fixAllMaterials() {
     currentData = parseFNC(originalFileContent);
 
     M.toast({ html: 'All materials fixed' });
+    displayData(currentData, currentFilename);
+    updateOptionsPanel();
+}
+
+// Remove all [[BAR]] sections (from [[BAR]] to the next [[ or end of string)
+function removeBarSections(text) {
+  return text.replace(/\[\[BAR\]\][\s\S]*?(?=\[\[|$)/g, '');
+}
+
+function createGroupedBarSection(groupedBars) {
+    if (!currentData || currentData.bars.length === 0) return '';
+
+    let barSection = '';
+
+    groupedBars.forEach(group => {
+        barSection += '[[BAR]]\n[HEAD]\n';
+        barSection += `N:${group.bar.name} M:${group.bar.material} CP:${group.bar.profileType} P:${group.bar.profile}\nLB${group.bar.length} BI${group.totalQuantity} ${group.bar.data}\n`;
+        group.bar.pieces.forEach(piece => {
+            barSection += `[PCS] C:${piece.project} D:${piece.drawing} N:${piece.mark} ${piece.position ? `POS:${piece.position}` : ''} QT${piece.quantity}\n`;
+        });
+        barSection += '\n'
+    });
+
+    return barSection;
+}
+
+function fixSimilarBars() {
+    const groupedBars = groupSimilarBars();
+    if (groupedBars.length === 0) return;
+
+    // Remove all existing [[BAR]] sections
+    let modifiedContent = removeBarSections(originalFileContent);
+    modifiedContent += '\n' + createGroupedBarSection(groupedBars);
+
+    originalFileContent = modifiedContent;
+
+    // Re-parse updated file
+    currentData = parseFNC(originalFileContent);
+
+    M.toast({ html: 'All bars grouped' });
     displayData(currentData, currentFilename);
     updateOptionsPanel();
 }
