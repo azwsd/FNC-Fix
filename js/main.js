@@ -6,6 +6,7 @@ let maxPositionLength = 12;
 let referenceProfile = null;
 let referenceMaterial = null;
 let originalFileContent = '';
+let duplicateBars = false;
 
 // Parse FNC file content
 function parseFNC(content) {
@@ -430,36 +431,36 @@ function renderBars(bars) {
             <div class="card-content">
                 <span class="card-title">Bars/Nests (${bars.length})</span>
                 ${bars.map((b, i) => `
-                    <div class="section">
-                        <h6>Bar ${i + 1}</h6>
+                    <div class="section ${b.unique ? '' : 'warning'}">
+                        <h6>Bar ${i + 1} ${b.unique ? '' : 'Duplicate'}</h6>
                         <div class="data-grid">
-                            <div class="data-item">
+                            <div class="data-item ${b.unique ? '' : 'warning'}">
                                 <span class="data-label">Name (N):</span>
                                 <span class="data-value">${b.name || '-'}</span>
                             </div>
-                            <div class="data-item ${isProfileMismatch(b, referenceProfile) ? 'warning' : ''}">
+                            <div class="data-item ${b.unique ? '' : 'warning'} ${isProfileMismatch(b, referenceProfile) ? 'warning' : ''}">
                                 <span class="data-label">
                                     Profile Type (CP):${isProfileMismatch(b, referenceProfile) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${b.profileType || '-'}</span>
                             </div>
-                            <div class="data-item ${isProfileMismatch(b, referenceProfile) ? 'warning' : ''}">
+                            <div class="data-item ${b.unique ? '' : 'warning'} ${isProfileMismatch(b, referenceProfile) ? 'warning' : ''}">
                                 <span class="data-label">
                                     Profile (P):${isProfileMismatch(b, referenceProfile) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${b.profile || '-'}</span>
                             </div>
-                            <div class="data-item ${isMaterialMismatch(b, referenceMaterial) ? 'warning' : ''}">
+                            <div class="data-item ${b.unique ? '' : 'warning'} ${isMaterialMismatch(b, referenceMaterial) ? 'warning' : ''}">
                                 <span class="data-label">
                                     Material (M):${isMaterialMismatch(b, referenceMaterial) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${b.material || '-'}</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${b.unique ? '' : 'warning'}">
                                 <span class="data-label">Length (LB):</span>
                                 <span class="data-value">${b.length || '-'} mm</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${b.unique ? '' : 'warning'}">
                                 <span class="data-label">Quantity (BI):</span>
                                 <span class="data-value">${b.quantity || '-'}</span>
                             </div>
@@ -501,7 +502,8 @@ function displayData(data, filename) {
     currentFilename = filename;
     referenceProfile = data.profiles.length > 0 ? data.profiles[0] : null;
     referenceMaterial = data.materials.length > 0 ? data.materials[0] : null;
-    
+    setBarsUniqueFlag();
+
     const filesCol = document.getElementById('files-col');
     filesCol.innerHTML = `
         <div style="padding: 20px;">
@@ -618,7 +620,7 @@ function updateOptionsPanel() {
         if (checkLength(p.position, maxPositionLength)) positionWarnings++;
     });
     
-    const warningHTML = (drawingWarnings > 0 || positionWarnings > 0) ? `
+    const lengthWarningHTML = (drawingWarnings > 0 || positionWarnings > 0) ? `
         <div class="warning-summary">
             ${drawingWarnings > 0 ? `<p>${drawingWarnings} drawing(s) exceed max length</p>` : ''}
             ${positionWarnings > 0 ? `<p>${positionWarnings} position(s) exceed max length</p>` : ''}
@@ -628,18 +630,34 @@ function updateOptionsPanel() {
     const profileCheck = checkProfileConsistency(currentData);
     const materialCheck = checkMaterialConsistency(currentData);
 
+    const profileMismatchWarningHTML = `
+        ${profileCheck.mismatched
+            ? `<p class="warning-summary">${profileCheck.count} profile inconsistency(s) found</p>
+            <button class="btn-small purple lighten-1 waves-effect" id="fix-profiles">Fix All Profiles</button>`
+            : '<p class="success-summary">All profiles consistent</p>'}
+    `
+
+    const materialMismatchWarningHTML = `
+        ${materialCheck.mismatched
+            ? `<p class="warning-summary">${materialCheck.count} material inconsistency(s) found</p>
+            <button class="btn-small purple lighten-1 waves-effect" id="fix-materials">Fix All Materials</button>`
+            : '<p class="success-summary">All materials consistent</p>'}
+    `
+    
+    const duplicateBarsWarningHTML = `
+        ${duplicateBars
+            ? `<p class="warning-summary">Duplicate bars/Nests found</p>
+            <button class="btn-small purple lighten-1 waves-effect" id="group-bars-btn">Group Duplicate Bars/Nests</button>`
+            : '<p class="success-summary">No duplicate bars/Nests found</p>'}
+    `;
+
     const consistencyHTML = `
         <div class="option-section consistency-section">
             <h6>Consistency Checks</h6>
-            ${warningHTML}
-            ${profileCheck.mismatched
-                ? `<p class="warning-summary">${profileCheck.count} profile inconsistency(s) found</p>
-                <button class="btn-small purple lighten-1 waves-effect" id="fix-profiles">Fix All Profiles</button>`
-                : '<p class="success-summary">All profiles consistent</p>'}
-            ${materialCheck.mismatched
-                ? `<p class="warning-summary">${materialCheck.count} material inconsistency(s) found</p>
-                <button class="btn-small purple lighten-1 waves-effect" id="fix-materials">Fix All Materials</button>`
-                : '<p class="success-summary">All materials consistent</p>'}
+            ${lengthWarningHTML}
+            ${profileMismatchWarningHTML}
+            ${materialMismatchWarningHTML}
+            ${duplicateBarsWarningHTML}
         </div>
     `;
 
@@ -682,14 +700,6 @@ function updateOptionsPanel() {
                     Execute Replacements
                 </button>
             </div>
-
-            <div class="option-section">
-                <h6>Group Similar Bars/Nests</h6>
-                <button class="btn waves-effect waves-light" id="group-bars-btn">
-                    Group Similar Bars/Nests
-                </button>
-            </div>
-
             <div class="option-section">
                 <button class="btn waves-effect waves-light" id="download-fnc-btn">
                     Download Modified FNC
@@ -947,6 +957,20 @@ function createGroupedBarSection(groupedBars) {
     return barSection;
 }
 
+function setBarsUniqueFlag() {
+    const seenHashes = new Set();
+    currentData.bars.forEach(bar => {
+        if (seenHashes.has(bar.hash)) {
+            bar.unique = false;
+            duplicateBars = true;
+        }
+        else {
+            bar.unique = true;
+            seenHashes.add(bar.hash);
+        }
+    });
+}
+
 function fixSimilarBars() {
     const groupedBars = groupSimilarBars();
     if (groupedBars.length === 0) return;
@@ -960,6 +984,7 @@ function fixSimilarBars() {
     // Re-parse updated file
     currentData = parseFNC(originalFileContent);
 
+    duplicateBars = false; // Reset global variable
     M.toast({ html: 'All bars grouped' });
     displayData(currentData, currentFilename);
     updateOptionsPanel();
