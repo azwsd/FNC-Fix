@@ -1,7 +1,9 @@
 // Global state
 let currentData = null;
 let currentFilename = '';
+let maxProjectLength = 12;
 let maxDrawingLength = 12;
+let maxMarkLength = 12;
 let maxPositionLength = 12;
 let referenceProfile = null;
 let referenceMaterial = null;
@@ -355,21 +357,21 @@ function renderPieces(pieces) {
                     <div class="section">
                         <h6>Piece ${i + 1}</h6>
                         <div class="data-grid">
-                            <div class="data-item">
-                                <span class="data-label">Project (C):</span>
+                            <div class="data-item ${checkLength(p.project, maxProjectLength) ? 'warning' : ''}">
+                                <span class="data-label">Project (C):${checkLength(p.project, maxProjectLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.project || '-'}</span>
                             </div>
                             <div class="data-item ${checkLength(p.drawing, maxDrawingLength) ? 'warning' : ''}">
                                 <span class="data-label">Drawing (D):${checkLength(p.drawing, maxDrawingLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.drawing || '-'}</span>
                             </div>
-                            <div class="data-item">
-                                <span class="data-label">Mark (N):</span>
+                            <div class="data-item ${checkLength(p.mark, maxMarkLength) ? 'warning' : ''}">
+                                <span class="data-label">Mark (M):${checkLength(p.mark, maxMarkLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.mark || '-'}</span>
                             </div>
                             ${p.position ? `
                             <div class="data-item ${checkLength(p.position, maxPositionLength) ? 'warning' : ''}">
-                                <span class="data-label">Position:${checkLength(p.position, maxPositionLength) ? 'Exceeds max length!' : ''}</span>
+                                <span class="data-label">Position (POS):${checkLength(p.position, maxPositionLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.position}</span>
                             </div>
                             ` : ''}
@@ -612,17 +614,23 @@ function updateOptionsPanel() {
     const optionsCol = document.getElementById('options-col');
     
     // Count warnings
+    let projectWarnings = 0;
     let drawingWarnings = 0;
+    let markWarnings = 0;
     let positionWarnings = 0;
     
     currentData.pieces.forEach(p => {
+        if (checkLength(p.project, maxProjectLength)) projectWarnings++;
         if (checkLength(p.drawing, maxDrawingLength)) drawingWarnings++;
+        if (checkLength(p.mark, maxMarkLength)) markWarnings++;
         if (checkLength(p.position, maxPositionLength)) positionWarnings++;
     });
     
     const lengthWarningHTML = (drawingWarnings > 0 || positionWarnings > 0) ? `
         <div class="warning-summary">
-            ${drawingWarnings > 0 ? `<p>${drawingWarnings} drawing(s) exceed max length</p>` : ''}
+        ${projectWarnings > 0 ? `<p>${projectWarnings} project(s) exceed max length</p>` : ''}
+        ${drawingWarnings > 0 ? `<p>${drawingWarnings} drawing(s) exceed max length</p>` : ''}
+            ${markWarnings > 0 ? `<p>${markWarnings} mark(s) exceed max length</p>` : ''}
             ${positionWarnings > 0 ? `<p>${positionWarnings} position(s) exceed max length</p>` : ''}
         </div>
     ` : '<div class="success-summary"><p>All fields within length limits</p></div>';
@@ -670,8 +678,16 @@ function updateOptionsPanel() {
                 ${lengthWarningHTML}
                 <h6>Max Length Settings</h6>
                 <div class="input-field">
+                    <label for="max-project-length" class="active">Max Project Length</label>
+                    <input type="number" id="max-project-length" value="${maxProjectLength}" min="1">
+                </div>
+                <div class="input-field">
                     <label for="max-drawing-length" class="active">Max Drawing Length</label>
                     <input type="number" id="max-drawing-length" value="${maxDrawingLength}" min="1">
+                </div>
+                <div class="input-field">
+                    <label for="max-mark-length" class="active">Max Mark Length</label>
+                    <input type="number" id="max-mark-length" value="${maxMarkLength}" min="1">
                 </div>
                 <div class="input-field">
                     <label for="max-position-length" class="active">Max Position Length</label>
@@ -726,19 +742,35 @@ function initializeOptionsPanel() {
 // Setup options listeners
 function setupOptionsListeners() {
     // Max length inputs
+    const maxProjectInput = document.getElementById('max-project-length');
     const maxDrawingInput = document.getElementById('max-drawing-length');
+    const maxMarkInput = document.getElementById('max-mark-length');
     const maxPositionInput = document.getElementById('max-position-length');
-    
+
+    if (maxProjectInput) {
+        maxProjectInput.addEventListener('input', (e) => {
+            maxProjectLength = parseInt(e.target.value) || 12;
+            displayData(currentData, currentFilename);
+        });
+    }
+
     if (maxDrawingInput) {
         maxDrawingInput.addEventListener('input', (e) => {
-            maxDrawingLength = parseInt(e.target.value) || 50;
+            maxDrawingInput = parseInt(e.target.value) || 12;
+            displayData(currentData, currentFilename);
+        });
+    }
+
+    if (maxMarkInput) {
+        maxMarkInput.addEventListener('input', (e) => {
+            maxMarkInput = parseInt(e.target.value) || 12;
             displayData(currentData, currentFilename);
         });
     }
     
     if (maxPositionInput) {
         maxPositionInput.addEventListener('input', (e) => {
-            maxPositionLength = parseInt(e.target.value) || 50;
+            maxPositionLength = parseInt(e.target.value) || 12;
             displayData(currentData, currentFilename);
         });
     }
