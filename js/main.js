@@ -9,6 +9,7 @@ let referenceProfile = null;
 let referenceMaterial = null;
 let originalFileContent = '';
 let duplicateBars = false;
+let duplicatePieces = false;
 
 // Parse FNC file content
 function parseFNC(content) {
@@ -73,6 +74,7 @@ function parseFNC(content) {
             currentBar = null;
         } else if (currentPiece && line === '' && currentBlock === 'PCS') {
             if (Object.keys(currentPiece).length > 0) {
+                currentPiece.hash = hashPiece(currentPiece);
                 data.pieces.push(currentPiece);
                 currentPiece = {};
             }
@@ -123,6 +125,41 @@ function hashBar(bar) {
   return hash.toString(36); // Convert to base-36 for shorter string
 }
 
+function hashPiece(piece) {
+    const hashString = [
+        piece.project || '',
+        piece.drawing || '',
+        piece.mark || '',
+        piece.position || '',
+        piece.quantity || ''
+    ].join('###');
+
+    // djb2 algorithm
+    let hash = 5381;
+    for (let i = 0; i < hashString.length; i++) {
+        hash = ((hash << 5) + hash) + hashString.charCodeAt(i); // hash * 33 + c
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return hash.toString(36); // Convert to base-36 for shorter string
+}
+
+function checkDuplicatePieces() {
+    const seenHashes = new Set();
+    duplicatePieces = false;
+    currentData.pieces.forEach(piece => {
+        if (seenHashes.has(piece.hash)) {
+            piece.unique = false;
+            duplicatePieces = true;
+        } else {
+            piece.unique = true;
+            seenHashes.add(piece.hash);
+        }
+    });
+    
+    return duplicatePieces;
+}
+
 function groupSimilarBars() {
     const barGroups = new Map();
     currentData.bars.forEach(bar => {
@@ -170,7 +207,7 @@ function parsePieceHeader(headerText) {
     const matches = {
         c: headerText.match(/C:(\S+)/),
         d: headerText.match(/D:(\S+)/),
-        n: headerText.match(/N:(\d+)/),
+        n: headerText.match(/N:(\S+)/),
         pos: headerText.match(/POS:(\S+)/),
         m: headerText.match(/M:(\S+)/),
         cp: headerText.match(/CP:(\S+)/),
@@ -348,72 +385,74 @@ function isMaterialMismatch(item, refMat) {
 
 function renderPieces(pieces) {
     if (pieces.length === 0) return '';
+
+    checkDuplicatePieces();
     
     return `
         <div class="card">
             <div class="card-content">
                 <span class="card-title">Pieces (${pieces.length})</span>
                 ${pieces.map((p, i) => `
-                    <div class="section">
-                        <h6>Piece ${i + 1}</h6>
+                    <div class="section ${p.unique ? '' : 'warning'}">
+                        <h6>Piece ${i + 1} ${p.unique ? '' : 'Duplicate'}</h6>
                         <div class="data-grid">
-                            <div class="data-item ${checkLength(p.project, maxProjectLength) ? 'warning' : ''}">
+                            <div class="data-item ${checkLength(p.project, maxProjectLength) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">Project (C):${checkLength(p.project, maxProjectLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.project || '-'}</span>
                             </div>
-                            <div class="data-item ${checkLength(p.drawing, maxDrawingLength) ? 'warning' : ''}">
+                            <div class="data-item ${checkLength(p.drawing, maxDrawingLength) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">Drawing (D):${checkLength(p.drawing, maxDrawingLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.drawing || '-'}</span>
                             </div>
-                            <div class="data-item ${checkLength(p.mark, maxMarkLength) ? 'warning' : ''}">
+                            <div class="data-item ${checkLength(p.mark, maxMarkLength) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">Mark (M):${checkLength(p.mark, maxMarkLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.mark || '-'}</span>
                             </div>
                             ${p.position ? `
-                            <div class="data-item ${checkLength(p.position, maxPositionLength) ? 'warning' : ''}">
+                            <div class="data-item ${checkLength(p.position, maxPositionLength) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">Position (POS):${checkLength(p.position, maxPositionLength) ? 'Exceeds max length!' : ''}</span>
                                 <span class="data-value">${p.position}</span>
                             </div>
                             ` : ''}
-                            <div class="data-item ${isProfileMismatch(p, referenceProfile) ? 'warning' : ''}">
+                            <div class="data-item ${isProfileMismatch(p, referenceProfile) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">
                                     Profile Type (CP):${isProfileMismatch(p, referenceProfile) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${p.profileType || '-'}</span>
                             </div>
-                            <div class="data-item ${isProfileMismatch(p, referenceProfile) ? 'warning' : ''}">
+                            <div class="data-item ${isProfileMismatch(p, referenceProfile) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">
                                     Profile (P):${isProfileMismatch(p, referenceProfile) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${p.profile || '-'}</span>
                             </div>
-                            <div class="data-item ${isMaterialMismatch(p, referenceMaterial) ? 'warning' : ''}">
+                            <div class="data-item ${isMaterialMismatch(p, referenceMaterial) || !p.unique ? 'warning' : ''}">
                                 <span class="data-label">
                                     Material (M):${isMaterialMismatch(p, referenceMaterial) ? 'Mismatch!' : ''}
                                 </span>
                                 <span class="data-value">${p.material || '-'}</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Length (LP):</span>
                                 <span class="data-value">${p.length || '-'} mm</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Web Start Cut (RAI):</span>
                                 <span class="data-value">${p.webStartCut || '-'} deg</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Web End Cut (RAF):</span>
                                 <span class="data-value">${p.webEndCut || '-'} deg</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Flange Start Cut (RBI):</span>
                                 <span class="data-value">${p.flangeStartCut || '-'} deg</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Flange End Cut (RBF):</span>
                                 <span class="data-value">${p.flangeEndCut || '-'} deg</span>
                             </div>
-                            <div class="data-item">
+                            <div class="data-item ${!p.unique ? 'warning' : ''}">
                                 <span class="data-label">Quantity (QI):</span>
                                 <span class="data-value">${p.quantity || '-'}</span>
                             </div>
@@ -659,12 +698,19 @@ function updateOptionsPanel() {
             : '<p class="success-summary">No duplicate bars/Nests found</p>'}
     `;
 
+    const duplicatePiecesWarningHTML = `
+        ${duplicatePieces
+            ? `<p class="warning-summary">Duplicate pieces found</p>`
+            : '<p class="success-summary">No duplicate pieces found</p>'}
+    `;
+
     const consistencyHTML = `
         <div class="option-section consistency-section">
             <h6>Consistency Checks</h6>
             ${profileMismatchWarningHTML}
             ${materialMismatchWarningHTML}
             ${duplicateBarsWarningHTML}
+            ${duplicatePiecesWarningHTML}
         </div>
     `;
 
@@ -992,6 +1038,7 @@ function createGroupedBarSection(groupedBars) {
 
 function setBarsUniqueFlag() {
     const seenHashes = new Set();
+    duplicateBars = false;
     currentData.bars.forEach(bar => {
         if (seenHashes.has(bar.hash)) {
             bar.unique = false;
